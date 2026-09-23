@@ -1,0 +1,68 @@
+name: 每日晨报
+
+on:
+  schedule:
+    # UTC → 北京时间次日 07:40 / 当日 08:00
+    - cron: '40 23 * * *'
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      send:
+        description: '是否真实推送到 QQ（默认仅采集和预览）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: morning-brief-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 北京日期
+        id: date
+        run: echo "day=$(TZ=Asia/Shanghai date +%F)" >> "$GITHUB_OUTPUT"
+      - name: 读取当天07点40采集结果
+        if: github.event.schedule == '0 0 * * *'
+        uses: actions/cache/restore@v4
+        with:
+          path: output
+          key: brief-v1-${{ steps.date.outputs.day }}
+      - name: 采集RSS
+        if: github.event.schedule != '0 0 * * *'
+        run: python collect_news.py
+      - name: 保存当天采集结果
+        if: github.event.schedule == '40 23 * * *'
+        uses: actions/cache/save@v4
+        with:
+          path: output
+          key: brief-v1-${{ steps.date.outputs.day }}
+      - name: 推送QQ（缺失或过期时重新采集）
+        if: github.event.schedule == '0 0 * * *' || inputs.send == true
+        env:
+          QMSG_KEY: ${{ secrets.QMSG_KEY }}
+          QMSG_QQ: ${{ secrets.QMSG_QQ }}
+          QMSG_GROUP: ${{ secrets.QMSG_GROUP }}
+        run: python cloud_brief.py
+      - name: 预览
+        if: github.event_name == 'workflow_dispatch' && inputs.send != true
+        run: python cloud_brief.py --dry-run
+      - name: 保留晨报与新闻原文链接
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: morning-brief-${{ steps.date.outputs.day }}-${{ github.run_id }}
+          path: output/
+          retention-days: 7
+          if-no-files-found: ignore
