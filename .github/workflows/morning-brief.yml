@@ -11,6 +11,10 @@ on:
         description: '是否真实发送企业微信图片（默认仅采集和预览）'
         type: boolean
         default: false
+      check_connection:
+        description: '仅验证自建应用凭证和可信IP，不发送消息'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,6 +42,14 @@ jobs:
       - name: 北京日期
         id: date
         run: echo "day=$(TZ=Asia/Shanghai date +%F)" >> "$GITHUB_OUTPUT"
+      - name: 验证企业微信自建应用连接
+        if: inputs.check_connection == true
+        env:
+          CORPID: ${{ secrets.CORPID }}
+          CORPSECRET: ${{ secrets.CORPSECRET }}
+          AGENTID: ${{ secrets.AGENTID }}
+          WECOM_HTTPS_PROXY: ${{ secrets.WECOM_HTTPS_PROXY }}
+        run: python cloud_brief.py --check-connection
       - name: 读取当天07点40采集结果
         if: github.event.schedule == '0 0 * * *'
         uses: actions/cache/restore@v4
@@ -56,12 +68,16 @@ jobs:
       - name: 生成两种晨报长图
         if: github.event.schedule != '0 0 * * *'
         run: python render_brief.py
-      - name: 推送企业微信图片（缺失或过期时重新采集）
+      - name: 自建应用上传素材并推送图片
         if: github.event.schedule == '0 0 * * *' || inputs.send == true
         env:
-          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          CORPID: ${{ secrets.CORPID }}
+          CORPSECRET: ${{ secrets.CORPSECRET }}
+          AGENTID: ${{ secrets.AGENTID }}
+          TOUSER: ${{ secrets.TOUSER }}
+          WECOM_HTTPS_PROXY: ${{ secrets.WECOM_HTTPS_PROXY }}
           BRIEF_STYLE: ${{ vars.BRIEF_STYLE || 'dark' }}
-        run: python cloud_brief.py --channel wecom
+        run: python cloud_brief.py --channel wecom_app
       - name: 预览
         if: github.event_name == 'workflow_dispatch' && inputs.send != true
         run: python cloud_brief.py --dry-run

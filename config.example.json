@@ -1,5 +1,17 @@
 {
   "channel": "wecom",
-  "qmsg": {"key": "", "qq": "", "group": ""},
-  "wecom": {"webhook": ""}
+  "qmsg": {
+    "key": "",
+    "qq": "",
+    "group": ""
+  },
+  "wecom": {
+    "webhook": ""
+  },
+  "wecom_app": {
+    "corpid": "",
+    "corpsecret": "",
+    "agentid": "",
+    "touser": ""
+  }
 }

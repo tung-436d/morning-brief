@@ -5,13 +5,31 @@ GitHub Actions 在云端运行，电脑关机不影响执行。采集与推送�
 ## 每日时间（北京时间）
 
 - **07:40**：读取 RSS，选取近 24 小时的国内、国际、财经、科技新闻，各最多 4 条，保存当天缓存。
-- **08:00**：读取当天缓存，生成长图并通过企业微信群机器人发送原生图片。没有当天有效结果时重新采集；所有来源都不可用则任务失败，不发送旧新闻。
+- **08:00**：读取当天缓存，生成长图并通过企业微信自建应用发送原生图片。没有当天有效结果时重新采集；所有来源都不可用则任务失败，不发送旧新闻。
 
 GitHub 的 cron 使用 UTC，分别是 `40 23 * * *` 和 `0 0 * * *`。定时任务可能延迟或被平台跳过，无法保证准点到达。公开仓库长期无活动时定时任务可能被停用，需要在 Actions 中重新启用。参见 [GitHub 定时任务说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
 
 ## GitHub 配置
 
-在仓库 Settings → Secrets and variables → Actions 中添加 `WECOM_WEBHOOK`（企业微信群机器人完整 Webhook 地址）。配置前，预览和生成图片可用，真实发送会明确报配置缺失。Actions Variables 可设置 `BRIEF_STYLE=paper` 使用白底版，默认 `dark` 为深色版。
+默认推送通道为企业微信自建应用 API，无需群机器人 Webhook。
+
+在仓库 Settings → Secrets and variables → Actions 中配置：
+
+| Secret | 用途 |
+| --- | --- |
+| `CORPID` | 企业/团队 ID |
+| `CORPSECRET` | 自建应用 Secret |
+| `AGENTID` | 自建应用 AgentId |
+| `TOUSER` | 接收人的通讯录成员账号 UserID，必须明确指定，不默认全员广播 |
+| `WECOM_HTTPS_PROXY` | 可选，具有固定可信出口的 HTTPS 请求代理地址 |
+
+调用链：`gettoken` → `agent/get`（验证权限与可信 IP）→ `media/upload?type=image` → `message/send`。素材临时上传，token 仅在内存中使用，异常日志不打印 token 或 Secret。接口成功仅表示 API 接受，不等于微信客户端已阅读；存在无效接收人则任务失败。
+
+接收人需要在应用可见范围内，并在微信关注该企业的“微信插件/微工作台”。微信端的实际可见性以企业配置及客户端验证为准。
+
+**可信 IP 前提**：企业微信错误 `60020` 表示出口未被允许。GitHub 标准托管 runner 的出口会变化，不能把某次 IP 加白就认为后续稳定。需使用受你控制的固定出口代理（配置 `WECOM_HTTPS_PROXY`，并在应用可信 IP 添加其公网地址），或迁移到固定公网 IP 的云端 runner。不要把全部公网地址加入白名单。电脑本地 runner 不满足关机照常发送的要求。
+
+Actions Variables 可设置 `BRIEF_STYLE=paper` 使用白底版，默认 `dark` 为深色版。手动运行勾选 `check_connection` 可只验证应用权限与可信 IP，不发送消息。
 
 旧 Qmsg 文字渠道的可选配置：
 
@@ -43,10 +61,10 @@ python collect_news.py
 python cloud_brief.py --dry-run
 ```
 
-真实推送前可复制 `config.example.json` 为 `config.json` 并填写密钥，或设置环境变量 `QMSG_KEY`：
+本地配置 `wecom_app` 四个字段，或使用相应环境变量。旧 Qmsg 通道 `config.example.json` 为 `config.json` 并填写密钥，或设置环境变量 `QMSG_KEY`：
 
 ```sh
-python cloud_brief.py
+python cloud_brief.py --channel wecom_app
 ```
 
 此项目从既有 WorkBuddy 推送脚本迁移，所有后续修改在独立晨报工作目录中进行。
@@ -56,7 +74,7 @@ python cloud_brief.py
 
 每天生成两份 1080 像素宽的 PNG：`output/brief-paper.png`（白底双栏）和 `output/brief-dark.png`（深色分区）。内容为 RSS 真实标题及源站摘要截取，附来源和发布时间；没有摘要时只展示标题，不编造正文或热度。图片与其他产物一起存入 Actions artifact。
 
-默认通道已切换为企业微信群机器人图片消息，使用 Base64 + MD5 直接上传，无需图床。Qmsg 文字推送保留为本地 `--channel qmsg` 选项，不再由定时任务调用。
+默认通道已切换为企业微信自建应用图片消息，先上传临时素材再发送 media_id，无需图床。Qmsg 文字推送保留为本地 `--channel qmsg` 选项，不再由定时任务调用。
 
 本地图片生成：
 

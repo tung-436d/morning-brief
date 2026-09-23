@@ -50,9 +50,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="output")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--channel", choices=['wecom', 'qmsg'], default='wecom')
+    parser.add_argument("--channel", choices=['wecom_app', 'wecom', 'qmsg'], default='wecom_app')
+    parser.add_argument("--check-connection", action="store_true")
     parser.add_argument("--style", choices=['paper', 'dark'], default=os.environ.get('BRIEF_STYLE') or 'dark')
     args = parser.parse_args()
+    if args.check_connection:
+        from wecom_app import send_app_image, app_config
+        send_app_image(None, app_config(load_config()), check_only=True)
+        raise SystemExit(0)
     directory = Path(args.output)
     ensure_fresh(directory)
     from render_brief import render_all
@@ -62,6 +67,11 @@ if __name__ == "__main__":
         print(text)
     elif args.channel == 'qmsg':
         send_sections(directory, load_config().get("qmsg", {}))
+    elif args.channel == 'wecom_app':
+        from wecom_app import send_app_image, app_config
+        result = send_app_image(directory / f'brief-{args.style}.png', app_config(load_config()))
+        result['style'] = args.style
+        (directory / 'delivery.json').write_text(json.dumps(result), encoding='utf-8')
     else:
         from push_image import send_image
         cfg = load_config()
