@@ -75,6 +75,37 @@ def split_text(text, limit=3500):
     return chunks
 
 
+class QmsgContentRejected(RuntimeError):
+    """Qmsg accepted the request but rejected its content asynchronously."""
+
+
+def confirm_qmsg(key, message_id, attempts=12):
+    if type(message_id) is not int or message_id <= 0:
+        raise RuntimeError("Qmsg 未返回有效消息ID，无法确认发送结果")
+    for attempt in range(attempts):
+        time.sleep(5)
+        try:
+            raw = http_post_form("https://qmsg.zendee.cn/v3/msg/status/" + key,
+                                 {"msgId": str(message_id)})
+            result = json.loads(raw)
+        except (ValueError, urllib.error.URLError, OSError):
+            raise RuntimeError("Qmsg 回执查询失败；消息可能已发送，未自动重发") from None
+        if not isinstance(result, dict) or result.get("success") is not True:
+            raise RuntimeError("Qmsg 回执查询未成功")
+        status = result.get("data")
+        if type(status) is not int:
+            raise RuntimeError("Qmsg 回执状态格式异常")
+        if status == 1:
+            return
+        if status == 2:
+            raise QmsgContentRejected("Qmsg 内容检测拦截（回执状态2）")
+        if status == -1:
+            raise RuntimeError("Qmsg 发送失败（回执状态-1）")
+        if status != 0:
+            raise RuntimeError("Qmsg 返回未知回执状态")
+    raise RuntimeError("Qmsg 暂未获得QQ回执，不能确认送达；未自动重发")
+
+
 # ---------------- 渠道实现 ----------------
 
 def push_qmsg(text, cfg):
@@ -107,7 +138,10 @@ def push_qmsg(text, cfg):
             raise RuntimeError("Qmsg 返回非 JSON 响应，未确认发送成功") from None
         if not isinstance(data, dict) or data.get("success") is not True:
             raise RuntimeError("Qmsg 未确认发送成功，请检查服务后台及配额")
-        print("[Qmsg] 已确认发送第 %d/%d 条" % (i + 1, len(chunks)))
+        message_id = data.get("data")
+        print("[Qmsg] 接口已受理，消息ID=%s；正在查询回执" % message_id)
+        confirm_qmsg(key, message_id)
+        print("[Qmsg] QQ发送回执成功，第 %d/%d 条" % (i + 1, len(chunks)))
 
 
 def push_wecom(text, cfg):

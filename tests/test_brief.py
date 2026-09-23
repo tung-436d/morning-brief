@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from collect_news import CST, parse_feed
 from cloud_brief import ensure_fresh
-from push_brief import push_qmsg, split_text
+from push_brief import push_qmsg, split_text, confirm_qmsg, QmsgContentRejected
 
 
 class BriefTests(unittest.TestCase):
@@ -38,9 +38,24 @@ class BriefTests(unittest.TestCase):
                     push_qmsg('test', {'key': 'test'})
 
     def test_qmsg_success(self):
-        with patch('push_brief.http_post_form', return_value='{"success":true}') as post:
+        with patch('push_brief.http_post_form', return_value='{"success":true,"data":42}') as post, patch('push_brief.confirm_qmsg') as confirm:
             push_qmsg('test', {'key': 'test', 'qq': '123'})
             self.assertEqual(post.call_args.args[1], {'msg': 'test', 'qq': '123'})
+            confirm.assert_called_once_with('test', 42)
+
+    def test_async_rejection_is_failure(self):
+        with patch('push_brief.http_post_form', return_value='{"success":true,"data":2}'), patch('push_brief.time.sleep'):
+            with self.assertRaises(QmsgContentRejected):
+                confirm_qmsg('test', 42)
+
+    def test_pending_then_success(self):
+        with patch('push_brief.http_post_form', side_effect=['{"success":true,"data":0}', '{"success":true,"data":1}']), patch('push_brief.time.sleep'):
+            confirm_qmsg('test', 42)
+
+    def test_pending_timeout_is_not_success(self):
+        with patch('push_brief.http_post_form', return_value='{"success":true,"data":0}'), patch('push_brief.time.sleep'):
+            with self.assertRaises(RuntimeError):
+                confirm_qmsg('test', 42, attempts=2)
 
     def test_stale_artifact_recollected(self):
         with tempfile.TemporaryDirectory() as tmp, patch('cloud_brief.collect') as collect:
