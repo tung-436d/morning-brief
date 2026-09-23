@@ -49,8 +49,11 @@ def parse_feed(data, now):
                          if x.get("rel", "alternate") == "alternate"), "")
         if not link.startswith(("https://", "http://")):
             link = ""
-        articles.append({"title": title, "url": link, "published": published.isoformat()})
-    return sorted(articles, key=lambda x: x["published"], reverse=True)
+        summary = clean(item.findtext("description") or item.findtext("summary") or '')
+        if summary == title:
+            summary = ''
+        articles.append({"title": title, "url": link, "published": published.isoformat(), "summary": summary[:500]})
+    return sorted(articles, key=lambda x: datetime.fromisoformat(x["published"]), reverse=True)
 
 
 def fetch_feed(feed, now):

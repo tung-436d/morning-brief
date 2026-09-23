@@ -1,6 +1,6 @@
 # 每日晨报 → QQ
 
-GitHub Actions 在云端运行，电脑关机不影响执行。Python 仅使用标准库，无需大模型或联网检索服务。
+GitHub Actions 在云端运行，电脑关机不影响执行。采集与推送使用 Python 标准库，图片排版使用 Pillow 和中文字体，无需大模型或联网检索服务。
 
 ## 每日时间（北京时间）
 
@@ -48,3 +48,20 @@ python cloud_brief.py
 ```
 
 此项目从既有 WorkBuddy 推送脚本迁移，所有后续修改在独立晨报工作目录中进行。
+
+
+## 自动生成晨报长图
+
+每天生成两份 1080 像素宽的 PNG：`output/brief-paper.png`（白底双栏）和 `output/brief-dark.png`（深色分区）。内容为 RSS 真实标题及源站摘要截取，附来源和发布时间；没有摘要时只展示标题，不编造正文或热度。图片与其他产物一起存入 Actions artifact。
+
+当前 Qmsg 3.0 官方文档未公开图片消息接口，**长图已可自动生成，但尚未实现 QQ 图片直发**；现有文字推送保持运行。接入图片推送需要另行提供支持图片的消息接口，不能把图片网址当作已发送图片。
+
+本地图片生成：
+
+```sh
+python -m pip install -r requirements.txt
+python collect_news.py
+python render_brief.py
+```
+
+Windows 自动使用微软雅黑；Ubuntu 安装 `fonts-noto-cjk`，或通过 `BRIEF_FONT` 指定中文字体文件。云端工作流已自动安装字体。

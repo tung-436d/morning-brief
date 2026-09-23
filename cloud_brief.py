@@ -52,6 +52,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     directory = Path(args.output)
     ensure_fresh(directory)
+    from render_brief import render_all
+    render_all(directory)
     text = (directory / "brief.txt").read_text(encoding="utf-8")
     if args.dry_run:
         print(text)
