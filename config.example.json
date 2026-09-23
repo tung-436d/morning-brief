@@ -1,4 +1,5 @@
 {
-  "channel": "qmsg",
-  "qmsg": {"key": "", "qq": "", "group": ""}
+  "channel": "wecom",
+  "qmsg": {"key": "", "qq": "", "group": ""},
+  "wecom": {"webhook": ""}
 }

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       send:
-        description: '是否真实推送到 QQ（默认仅采集和预览）'
+        description: '是否真实发送企业微信图片（默认仅采集和预览）'
         type: boolean
         default: false
 
@@ -56,13 +56,12 @@ jobs:
       - name: 生成两种晨报长图
         if: github.event.schedule != '0 0 * * *'
         run: python render_brief.py
-      - name: 推送QQ（缺失或过期时重新采集）
+      - name: 推送企业微信图片（缺失或过期时重新采集）
         if: github.event.schedule == '0 0 * * *' || inputs.send == true
         env:
-          QMSG_KEY: ${{ secrets.QMSG_KEY }}
-          QMSG_QQ: ${{ secrets.QMSG_QQ }}
-          QMSG_GROUP: ${{ secrets.QMSG_GROUP }}
-        run: python cloud_brief.py
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          BRIEF_STYLE: ${{ vars.BRIEF_STYLE || 'dark' }}
+        run: python cloud_brief.py --channel wecom
       - name: 预览
         if: github.event_name == 'workflow_dispatch' && inputs.send != true
         run: python cloud_brief.py --dry-run

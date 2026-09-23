@@ -1,25 +1,27 @@
-# 每日晨报 → QQ
+# 每日晨报长图 → 企业微信
 
 GitHub Actions 在云端运行，电脑关机不影响执行。采集与推送使用 Python 标准库，图片排版使用 Pillow 和中文字体，无需大模型或联网检索服务。
 
 ## 每日时间（北京时间）
 
 - **07:40**：读取 RSS，选取近 24 小时的国内、国际、财经、科技新闻，各最多 4 条，保存当天缓存。
-- **08:00**：读取当天缓存，通过 Qmsg 推送 QQ。没有当天有效结果时重新采集；所有来源都不可用则任务失败，不发送旧新闻。
+- **08:00**：读取当天缓存，生成长图并通过企业微信群机器人发送原生图片。没有当天有效结果时重新采集；所有来源都不可用则任务失败，不发送旧新闻。
 
 GitHub 的 cron 使用 UTC，分别是 `40 23 * * *` 和 `0 0 * * *`。定时任务可能延迟或被平台跳过，无法保证准点到达。公开仓库长期无活动时定时任务可能被停用，需要在 Actions 中重新启用。参见 [GitHub 定时任务说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
 
 ## GitHub 配置
 
-在仓库 Settings → Secrets and variables → Actions 中添加：
+在仓库 Settings → Secrets and variables → Actions 中添加 `WECOM_WEBHOOK`（企业微信群机器人完整 Webhook 地址）。配置前，预览和生成图片可用，真实发送会明确报配置缺失。Actions Variables 可设置 `BRIEF_STYLE=paper` 使用白底版，默认 `dark` 为深色版。
+
+旧 Qmsg 文字渠道的可选配置：
 
 | Secret | 用途 |
 | --- | --- |
-| `QMSG_KEY` | 必填，Qmsg 推送密钥 |
+| `QMSG_KEY` | 必填，旧 Qmsg 推送密钥 |
 | `QMSG_QQ` | 可选，指定 QQ；空值沿用 Qmsg 后台接收人 |
 | `QMSG_GROUP` | 可选，群号；设置时优先于 QQ |
 
-工作流必须存在于默认分支。Actions → 每日晨报 → Run workflow 默认只预览；勾选 `send` 才会真实发送。手动推送及重跑会再次发送，请勿在已成功发送后重复执行。
+工作流必须存在于默认分支。Actions → 每日晨报 → Run workflow 默认只预览；勾选 `send` 才会真实发送企业微信图片。手动推送及重跑会再次发送，请勿在已成功发送后重复执行。
 
 公开仓库可查看源代码和工作流日志。密钥只保存在 Actions Secrets，本地 `config.json` 被 Git 忽略。不要上传任何真实配置。
 
@@ -54,7 +56,7 @@ python cloud_brief.py
 
 每天生成两份 1080 像素宽的 PNG：`output/brief-paper.png`（白底双栏）和 `output/brief-dark.png`（深色分区）。内容为 RSS 真实标题及源站摘要截取，附来源和发布时间；没有摘要时只展示标题，不编造正文或热度。图片与其他产物一起存入 Actions artifact。
 
-当前 Qmsg 3.0 官方文档未公开图片消息接口，**长图已可自动生成，但尚未实现 QQ 图片直发**；现有文字推送保持运行。接入图片推送需要另行提供支持图片的消息接口，不能把图片网址当作已发送图片。
+默认通道已切换为企业微信群机器人图片消息，使用 Base64 + MD5 直接上传，无需图床。Qmsg 文字推送保留为本地 `--channel qmsg` 选项，不再由定时任务调用。
 
 本地图片生成：
 

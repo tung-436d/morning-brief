@@ -2,6 +2,7 @@
 import argparse
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 
 from collect_news import CST, collect
@@ -49,6 +50,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="output")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--channel", choices=['wecom', 'qmsg'], default='wecom')
+    parser.add_argument("--style", choices=['paper', 'dark'], default=os.environ.get('BRIEF_STYLE') or 'dark')
     args = parser.parse_args()
     directory = Path(args.output)
     ensure_fresh(directory)
@@ -57,5 +60,11 @@ if __name__ == "__main__":
     text = (directory / "brief.txt").read_text(encoding="utf-8")
     if args.dry_run:
         print(text)
-    else:
+    elif args.channel == 'qmsg':
         send_sections(directory, load_config().get("qmsg", {}))
+    else:
+        from push_image import send_image
+        cfg = load_config()
+        webhook = os.environ.get('WECOM_WEBHOOK') or cfg.get('wecom', {}).get('webhook', '')
+        send_image(directory / f'brief-{args.style}.png', webhook)
+        (directory / 'delivery.json').write_text(json.dumps({'channel': 'wecom', 'status': 'api_success', 'style': args.style}), encoding='utf-8')
